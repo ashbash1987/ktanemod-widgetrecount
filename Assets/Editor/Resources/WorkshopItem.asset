@@ -11,9 +11,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5cf2299c8864afe4ab42466f546ae20d, type: 3}
   m_Name: WorkshopItem
   m_EditorClassIdentifier: 
-  WorkshopPublishedFileID: 0
+  WorkshopPublishedFileID: 908423347
   Title: Widget Expand
-  Description: 
+  Description: "This mod increases the number of widget slots that will be taken up
+    on a bomb. Normally, a bomb will consist of 1 serial number and 5 other widgets.
+    Although the number of serial number widgets is not configurable, you can configure
+    the number of other widget slots to include. It currently does not allow configuration
+    of what widgets to pick from though.\r\n\r\nTo change the number of widget slots
+    taken up on a bomb, you can edit the mod settings for the module. There will be
+    two values to tweak: [b][i]\"minimumWidgetCount\"[/i][/b] and [b][i]\"maximumWidgetCount\"[/i][/b].
+    Each time a bomb is generated, it will pick a random number of widgets in the
+    inclusive range between [b][i]\"minimumWidgetCount\"[/i][/b] and [b][i]\"maximumWidgetCount\"[/i][/b].
+    To force a bomb to always have the same number of widgets, just set both properties
+    to the same numeric value.\r\n\r\nThis was an experimental mod that I messed around
+    with over Christmas, and I've just decided to upload it as it currently stands.
+    It's not perfect, and there are likely bugs with it, so subscribers beware!\r\n\r\nIn
+    the future, I'd like to have it feature in the freeplay case as a custom setting
+    (where it'll fit though, I don't know!), and also have it be configurable in some
+    way for custom missions. That way the vanilla game wouldn't necessarily get affected
+    by this mod."
   PreviewImage: {fileID: 2800000, guid: a74ac0e6597ff8145915c7a6717a8ea9, type: 3}
   Tags:
   - Other
