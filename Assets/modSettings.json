@@ -1,4 +1,7 @@
 {
-	"minimumWidgetCount": 7,
-	"maximumWidgetCount": 7
+  "allowWidgetCountChange": true,
+  "minimumWidgetCount": 7,
+  "maximumWidgetCount": 7,
+
+  "allowSerialNumberChange": true
 }
