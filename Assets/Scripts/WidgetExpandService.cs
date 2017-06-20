@@ -8,13 +8,15 @@ using UnityEngine;
 
 public class WidgetExpandService : MonoBehaviour
 {
-    private static int SettingsVersion = 1;
+    private static int SettingsVersion = 2;
     public class WidgetExpandModSettings
     {
         public int fileVersion;
+        public bool allowWidgetCountChange = true;
         public int minimumWidgetCount = 7;
         public int maximumWidgetCount = 7;
-        public bool enableCustomIndicators = true;
+        public bool allowSerialNumberChange = true;
+        public bool allowCustomIndicators = true;
     }
 
     private WidgetExpandModSettings _modSettings = new WidgetExpandModSettings();
@@ -29,36 +31,67 @@ public class WidgetExpandService : MonoBehaviour
     private List<string> _customIndicators = null;
     private bool _refreshWidgetCount = true;
 
+    private Type _serialNumberType;
+    private FieldInfo _serialNumberArrayField;
+    private MethodInfo _serialNumberStartMethod;
+
+    private void DebugLog(object text, params object[] formatting)
+    {
+        Debug.LogFormat("[WidgetExpander] " + text, formatting);
+    }
+
+    private void ReadSettings()
+    {
+        string ModSettingsDirectory = Path.Combine(Application.persistentDataPath, "Modsettings");
+        string ModSettings = Path.Combine(ModSettingsDirectory, "WidgetExpand-settings.txt");
+        if (File.Exists(ModSettings))
+        {
+            string settings = File.ReadAllText(ModSettings);
+            _modSettings = JsonConvert.DeserializeObject<WidgetExpandModSettings>(settings);
+            DebugLog("Widget Expansion: {0}\nMinimum: {1}\nMaximum: {2}", _modSettings.allowWidgetCountChange ? "Enabled" : "Disabled", _modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount);
+            DebugLog("Serial Number Change: {0}", _modSettings.allowSerialNumberChange ? "Enabled" : "Disabled");
+            DebugLog("Custom Indicators: {0}", _modSettings.allowCustomIndicators ? "Enabled" : "Disabled");
+
+            if (_modSettings.fileVersion != SettingsVersion)
+            {
+                DebugLog("Settings version updated");
+                _modSettings.fileVersion = SettingsVersion;
+                settings = JsonConvert.SerializeObject(_modSettings, Formatting.Indented);
+                File.WriteAllText(ModSettings, settings);
+                DebugLog("New settings = {0}", settings);
+            }
+        }
+        else
+        {
+            _modSettings = new WidgetExpandModSettings();
+            try
+            {
+                if (!Directory.Exists(ModSettingsDirectory))
+                    Directory.CreateDirectory(ModSettingsDirectory);
+                _modSettings.fileVersion = SettingsVersion;
+                string settings = JsonConvert.SerializeObject(_modSettings, Formatting.Indented);
+                File.WriteAllText(ModSettings, settings);
+                DebugLog("New settings = {0}", settings);
+            }
+            catch (Exception ex)
+            {
+                DebugLog("Failed to Create settings file due to Exception:\n{0}",ex.ToString());
+            }
+        }
+    }
+
     private void Start()
     {
         _widgetGeneratorType = ReflectionHelper.FindType("WidgetGenerator");
-        Debug.Log("Widget generator type = " + _widgetGeneratorType.ToString());
-
         _widgetCountField = _widgetGeneratorType.GetField("NumberToGenerate", BindingFlags.Instance | BindingFlags.Public);
-        Debug.Log("Widget count field = " + _widgetCountField.ToString());
 
         _indicatorWidgetType = ReflectionHelper.FindType("IndicatorWidget");
-        Debug.Log("Indicator Widget type = " + _indicatorWidgetType.ToString());
-
         _indicatorLabelsField = _indicatorWidgetType.GetField("Labels", BindingFlags.Public | BindingFlags.Static);
-        Debug.Log("Indicator labels field = " + _indicatorLabelsField.ToString());
-
         _knownIndicators = (List<string>) _indicatorLabelsField.GetValue(null);
-        string indicators = "";
-        foreach (string label in _knownIndicators)
-        {
-            if (indicators == "")
-                indicators = label;
-            else
-                indicators += ", " + label;
-        }
-        Debug.LogFormat("The Following Indicators are present: {0}", indicators);
-
-        KMModSettings modSettingsComponent = GetComponent<KMModSettings>();
-        Debug.Log("Widget expand settings = " + modSettingsComponent.Settings);
-        _modSettings = JsonConvert.DeserializeObject<WidgetExpandModSettings>(modSettingsComponent.Settings);
-        Debug.Log(string.Format("Widget expand settings: minimum = {0}, maximum = {1}", _modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount));
-        Debug.Log(string.Format("Enable custom indicators: {0}", _modSettings.enableCustomIndicators));
+        
+        _serialNumberType = ReflectionHelper.FindType("SerialNumber");
+        _serialNumberArrayField = _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
+        _serialNumberStartMethod = _serialNumberType.GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
@@ -74,30 +107,34 @@ public class WidgetExpandService : MonoBehaviour
 
     private void OnStateChange(KMGameInfo.State state)
     {
-        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Transitioning || state == KMGameInfo.State.Setup;
-    }
+        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Gameplay;
 
-    private void RefreshSettings()
-    {
-        string ModSettings = Path.Combine(Path.Combine(Application.persistentDataPath, "Modsettings"), "WidgetExpand-settings.txt");
-        if (File.Exists(ModSettings))
+        if (_refreshWidgetCount && _modSettings.allowSerialNumberChange)
         {
-            Debug.Log("Attempting to Refresh the settings");
-            string settings = File.ReadAllText(ModSettings);
-            _modSettings = JsonConvert.DeserializeObject<WidgetExpandModSettings>(settings);
-
-            if (_modSettings.fileVersion != SettingsVersion)
-            {
-                Debug.Log("Settings Version changed - Adding new Settings");
-                _modSettings.fileVersion = SettingsVersion;
-                settings = JsonConvert.SerializeObject(_modSettings, Formatting.Indented);
-                File.WriteAllText(ModSettings, settings);
-                Debug.LogFormat("New settings = {0}", settings);
-            }
+            StartCoroutine(ReplaceSerialNumber());
         }
+       
     }
 
-    private void Shuffle()
+    private void DebugPrintList(List<string> list, int count)
+    {
+        string listStr = "";
+        for (var i = 0; i < count; i++)
+        {
+            if (listStr == "")
+                listStr = list[i];
+            else
+                listStr += ", " + list[i];
+
+            if (i % 16 != 15) continue;
+            DebugLog(listStr);
+            listStr = "";
+        }
+        if(listStr != "")
+            DebugLog(listStr);
+    }
+
+    private void ShuffleCustomIndicators()
     {
         if (_customIndicators == null)
         {
@@ -125,41 +162,29 @@ public class WidgetExpandService : MonoBehaviour
         }
     }
 
-    private List<string> MakeList()
+    private void SetCustomIndicators(bool allowed)
     {
-        Shuffle();
+        if (!allowed)
+        {
+            _indicatorLabelsField.SetValue(null, _knownIndicators);
+            return;
+        }
 
         int count = Math.Max(_modSettings.maximumWidgetCount - 12, (_modSettings.minimumWidgetCount + 1) / 2);
-        count = Math.Min(count, _customIndicators.Count);
-
         List<string> labels = new List<string>(_knownIndicators);
-        if (!_modSettings.enableCustomIndicators)
-            return labels;
-
         labels.Add("NLL");
 
+        DebugLog("In Addition to the standard 11 Indicators as well as NLL");
+        DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
+        DebugPrintList(_customIndicators, count);
 
-        Debug.Log("In Addition to the standard 11 Indicators as well as NLL");
-        Debug.LogFormat("The following {0} may spawn on the upcoming bomb(s)",count);
+        count = Math.Min(count, _customIndicators.Count);
 
-        
-        string indicators = "";
+        ShuffleCustomIndicators();
         for (var i = 0; i < count; i++)
-        {
-            if (indicators == "")
-                indicators = _customIndicators[i];
-            else
-                indicators += ", " + _customIndicators[i];
-            if ((i % 16) == 15)
-            {
-                Debug.Log(indicators);
-                indicators = "";
-            }
             labels.Add(_customIndicators[i]);
-        }
-        Debug.Log(indicators);
 
-        return labels;
+        _indicatorLabelsField.SetValue(null, labels);
     }
 
     private void UpdateWidgetCount()
@@ -167,23 +192,40 @@ public class WidgetExpandService : MonoBehaviour
         UnityEngine.Object widgetGenerator = FindObjectOfType(_widgetGeneratorType);
         if (widgetGenerator == null)
         {
-            Debug.Log("Failed to find the widget generator object.");
             return;
         }
-
-        //Get Fresh settings to apply to the next bomb
-        RefreshSettings();
-
         //Because the rule manager resets the random seed to 1 before bomb generation
         UnityEngine.Random.InitState((int)Time.time);
 
-        int widgetCount = UnityEngine.Random.Range(Mathf.Min(_modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount), Mathf.Max(_modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount) + 1);
-        _widgetCountField.SetValue(widgetGenerator, widgetCount);
-        Debug.Log(string.Format("Widget count set to {0}.", widgetCount));
+        ReadSettings();
 
-        List<string> list = MakeList();
-        _indicatorLabelsField.SetValue(null, list);
+        int widgetCount = UnityEngine.Random.Range(Mathf.Min(_modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount), Mathf.Max(_modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount) + 1);
+        _widgetCountField.SetValue(widgetGenerator, _modSettings.allowWidgetCountChange ? widgetCount : 5);
+        if (_modSettings.allowWidgetCountChange)
+        {
+            DebugLog("Widget count set to {0}.", widgetCount);
+        }
+
+        SetCustomIndicators(_modSettings.allowCustomIndicators);
         
         _refreshWidgetCount = false;
+    }
+
+    IEnumerator ReplaceSerialNumber()
+    {
+        object serialNumber = null;
+        yield return new WaitUntil(() => { serialNumber = FindObjectOfType(_serialNumberType); return serialNumber != null; });
+
+        DebugLog("Replacing serial number...");
+
+        _serialNumberArrayField.SetValue(serialNumber, new char[]
+            {
+                'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+            }
+        );
+
+        _serialNumberStartMethod.Invoke(serialNumber, null);
     }
 }
