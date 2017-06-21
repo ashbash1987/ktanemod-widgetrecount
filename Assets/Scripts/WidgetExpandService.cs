@@ -9,6 +9,7 @@ using UnityEngine;
 public class WidgetExpandService : MonoBehaviour
 {
     private static int SettingsVersion = 2;
+
     public class WidgetExpandModSettings
     {
         public int fileVersion;
@@ -49,9 +50,12 @@ public class WidgetExpandService : MonoBehaviour
         {
             string settings = File.ReadAllText(ModSettings);
             _modSettings = JsonConvert.DeserializeObject<WidgetExpandModSettings>(settings);
-            DebugLog("Widget Expansion: {0}\nMinimum: {1}\nMaximum: {2}", _modSettings.allowWidgetCountChange ? "Enabled" : "Disabled", _modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount);
+            DebugLog("Widget Expansion: {0}\nMinimum: {1}\nMaximum: {2}",
+                _modSettings.allowWidgetCountChange ? "Enabled" : "Disabled", _modSettings.minimumWidgetCount,
+                _modSettings.maximumWidgetCount);
             DebugLog("Serial Number Change: {0}", _modSettings.allowSerialNumberChange ? "Enabled" : "Disabled");
-            DebugLog("Custom Indicators: {0}\nMinimum: {1}", _modSettings.allowCustomIndicators ? "Enabled" : "Disabled", _modSettings.minimumCustomIndicators);
+            DebugLog("Custom Indicators: {0}\nMinimum: {1}",
+                _modSettings.allowCustomIndicators ? "Enabled" : "Disabled", _modSettings.minimumCustomIndicators);
 
             if (_modSettings.fileVersion != SettingsVersion)
             {
@@ -76,46 +80,76 @@ public class WidgetExpandService : MonoBehaviour
             }
             catch (Exception ex)
             {
-                DebugLog("Failed to Create settings file due to Exception:\n{0}",ex.ToString());
+                DebugLog("Failed to Create settings file due to Exception:\n{0}", ex.ToString());
             }
         }
+    }
+
+    private void InitCustomIndicators()
+    {
+        string _letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        _customIndicators = new List<string>();
+
+        foreach (var x in _letters)
+        foreach (var y in _letters)
+        foreach (var z in _letters)
+            _customIndicators.Add(x.ToString() + y + z);
+
+        foreach (var x in _knownIndicators)
+            _customIndicators.Remove(x);
+        _customIndicators.Remove("NLL");
     }
 
     private void Start()
     {
         _widgetGeneratorType = ReflectionHelper.FindType("WidgetGenerator");
-        _widgetCountField = _widgetGeneratorType.GetField("NumberToGenerate", BindingFlags.Instance | BindingFlags.Public);
+        _widgetCountField = _widgetGeneratorType.GetField("NumberToGenerate",
+            BindingFlags.Instance | BindingFlags.Public);
 
         _indicatorWidgetType = ReflectionHelper.FindType("IndicatorWidget");
         _indicatorLabelsField = _indicatorWidgetType.GetField("Labels", BindingFlags.Public | BindingFlags.Static);
         _knownIndicators = (List<string>) _indicatorLabelsField.GetValue(null);
-        
+        InitCustomIndicators();
+
         _serialNumberType = ReflectionHelper.FindType("SerialNumber");
-        _serialNumberArrayField = _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
+        _serialNumberArrayField =
+            _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
         _serialNumberStartMethod = _serialNumberType.GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
+
+        ReadSettings();
     }
 
     private void LateUpdate()
     {
-        if (_refreshWidgetCount)
+        try
         {
-            UpdateWidgetCount();
+            if (_refreshWidgetCount)
+            {
+                UpdateWidgetCount();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog("An Exception occured: \n{0}", ex.ToString());
+            _refreshWidgetCount = false;
         }
     }
 
     private KMGameInfo.State _state;
+
     private void OnStateChange(KMGameInfo.State state)
     {
-        DebugLog("Game State changed to {0}",state.ToString());
+        DebugLog("Game State changed to {0}", state.ToString());
         _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Gameplay;
         _state = state;
 
         if (state == KMGameInfo.State.Transitioning)
         {
-            ReadSettings();
+            
+            SetCustomIndicators(_modSettings.allowCustomIndicators);
         }
 
         if (_refreshWidgetCount && _modSettings.allowSerialNumberChange)
@@ -138,32 +172,17 @@ public class WidgetExpandService : MonoBehaviour
             DebugLog(listStr);
             listStr = "";
         }
-        if(listStr != "")
+        if (listStr != "")
             DebugLog(listStr);
     }
 
     private void ShuffleCustomIndicators()
     {
-        if (_customIndicators == null)
-        {
-            string _letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            _customIndicators = new List<string>();
-
-            foreach (var x in _letters)
-                foreach (var y in _letters)
-                    foreach (var z in _letters)
-                        _customIndicators.Add(x.ToString() + y + z);
-
-            foreach (var x in _knownIndicators)
-                _customIndicators.Remove(x);
-            _customIndicators.Remove("NLL");
-        }
-
         var list = _customIndicators;
         int n = _customIndicators.Count;
         while (n-- > 0)
         {
-            int k = UnityEngine.Random.Range(0, n+1);
+            int k = UnityEngine.Random.Range(0, n + 1);
             string value = list[k];
             list[k] = list[n];
             list[n] = value;
@@ -177,23 +196,24 @@ public class WidgetExpandService : MonoBehaviour
             _indicatorLabelsField.SetValue(null, _knownIndicators);
             return;
         }
-
         int count = Math.Max(_modSettings.maximumWidgetCount - 12, _modSettings.minimumCustomIndicators);
         count = Math.Min(count, _customIndicators.Count);
 
         List<string> labels = new List<string>(_knownIndicators);
-        labels.Add("NLL");
 
-        DebugLog("In Addition to the standard 11 Indicators as well as NLL");
-        DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
-        DebugPrintList(_customIndicators, count);
+        labels.Add("NLL");
 
         ShuffleCustomIndicators();
         for (var i = 0; i < count; i++)
             labels.Add(_customIndicators[i]);
 
+        DebugLog("In Addition to the standard 11 Indicators as well as NLL");
+        DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
+        DebugPrintList(_customIndicators, count);
+
         _indicatorLabelsField.SetValue(null, labels);
     }
+
 
     private void UpdateWidgetCount()
     {
@@ -202,6 +222,7 @@ public class WidgetExpandService : MonoBehaviour
         {
             return;
         }
+
         //Because the rule manager resets the random seed to 1 before bomb generation
         UnityEngine.Random.InitState((int)Time.time);
 
@@ -212,8 +233,6 @@ public class WidgetExpandService : MonoBehaviour
             DebugLog("Widget count set to {0}.", widgetCount);
         }
 
-        SetCustomIndicators(_modSettings.allowCustomIndicators);
-        
         _refreshWidgetCount = false;
     }
 
