@@ -118,8 +118,6 @@ public class WidgetExpandService : MonoBehaviour
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
-
-        ReadSettings();
     }
 
     private void LateUpdate()
@@ -143,18 +141,15 @@ public class WidgetExpandService : MonoBehaviour
     private void OnStateChange(KMGameInfo.State state)
     {
         DebugLog("Game State changed to {0}", state.ToString());
-        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Gameplay;
+        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Transitioning;
         _state = state;
 
         if (state == KMGameInfo.State.Transitioning)
         {
-            
+            ReadSettings();
+            _refreshWidgetCount &= _modSettings.allowWidgetCountChange;
             SetCustomIndicators(_modSettings.allowCustomIndicators);
-        }
-
-        if (_refreshWidgetCount && _modSettings.allowSerialNumberChange)
-        {
-            StartCoroutine(ReplaceSerialNumber());
+            StartCoroutine(ReplaceSerialNumber(_modSettings.allowSerialNumberChange));
         }
     }
 
@@ -236,11 +231,16 @@ public class WidgetExpandService : MonoBehaviour
         _refreshWidgetCount = false;
     }
 
-    IEnumerator ReplaceSerialNumber()
+    IEnumerator ReplaceSerialNumber(bool allowed)
     {
-        if (_state != KMGameInfo.State.Gameplay) yield break;
+        if (!allowed) yield break;
         object serialNumber = null;
-        yield return new WaitUntil(() => { serialNumber = FindObjectOfType(_serialNumberType); return serialNumber != null; });
+        yield return new WaitUntil(() =>
+        {
+            serialNumber = FindObjectOfType(_serialNumberType);
+            return serialNumber != null || _state == KMGameInfo.State.Setup || _state == KMGameInfo.State.PostGame;
+        });
+        if (serialNumber == null) yield break;
 
         DebugLog("Replacing serial number...");
         foreach (var sn in FindObjectsOfType(_serialNumberType))
