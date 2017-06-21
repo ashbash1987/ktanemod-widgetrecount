@@ -16,6 +16,7 @@ public class WidgetExpandService : MonoBehaviour
         public int minimumWidgetCount = 7;
         public int maximumWidgetCount = 7;
         public bool allowSerialNumberChange = true;
+        public int minimumCustomIndicators = 5;
         public bool allowCustomIndicators = true;
     }
 
@@ -50,7 +51,7 @@ public class WidgetExpandService : MonoBehaviour
             _modSettings = JsonConvert.DeserializeObject<WidgetExpandModSettings>(settings);
             DebugLog("Widget Expansion: {0}\nMinimum: {1}\nMaximum: {2}", _modSettings.allowWidgetCountChange ? "Enabled" : "Disabled", _modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount);
             DebugLog("Serial Number Change: {0}", _modSettings.allowSerialNumberChange ? "Enabled" : "Disabled");
-            DebugLog("Custom Indicators: {0}", _modSettings.allowCustomIndicators ? "Enabled" : "Disabled");
+            DebugLog("Custom Indicators: {0}\nMinimum: {1}", _modSettings.allowCustomIndicators ? "Enabled" : "Disabled", _modSettings.minimumCustomIndicators);
 
             if (_modSettings.fileVersion != SettingsVersion)
             {
@@ -105,15 +106,22 @@ public class WidgetExpandService : MonoBehaviour
         }
     }
 
+    private KMGameInfo.State _state;
     private void OnStateChange(KMGameInfo.State state)
     {
+        DebugLog("Game State changed to {0}",state.ToString());
         _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Gameplay;
+        _state = state;
+
+        if (state == KMGameInfo.State.Transitioning)
+        {
+            ReadSettings();
+        }
 
         if (_refreshWidgetCount && _modSettings.allowSerialNumberChange)
         {
             StartCoroutine(ReplaceSerialNumber());
         }
-       
     }
 
     private void DebugPrintList(List<string> list, int count)
@@ -170,15 +178,15 @@ public class WidgetExpandService : MonoBehaviour
             return;
         }
 
-        int count = Math.Max(_modSettings.maximumWidgetCount - 12, (_modSettings.minimumWidgetCount + 1) / 2);
+        int count = Math.Max(_modSettings.maximumWidgetCount - 12, _modSettings.minimumCustomIndicators);
+        count = Math.Min(count, _customIndicators.Count);
+
         List<string> labels = new List<string>(_knownIndicators);
         labels.Add("NLL");
 
         DebugLog("In Addition to the standard 11 Indicators as well as NLL");
         DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
         DebugPrintList(_customIndicators, count);
-
-        count = Math.Min(count, _customIndicators.Count);
 
         ShuffleCustomIndicators();
         for (var i = 0; i < count; i++)
@@ -197,8 +205,6 @@ public class WidgetExpandService : MonoBehaviour
         //Because the rule manager resets the random seed to 1 before bomb generation
         UnityEngine.Random.InitState((int)Time.time);
 
-        ReadSettings();
-
         int widgetCount = UnityEngine.Random.Range(Mathf.Min(_modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount), Mathf.Max(_modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount) + 1);
         _widgetCountField.SetValue(widgetGenerator, _modSettings.allowWidgetCountChange ? widgetCount : 5);
         if (_modSettings.allowWidgetCountChange)
@@ -213,19 +219,22 @@ public class WidgetExpandService : MonoBehaviour
 
     IEnumerator ReplaceSerialNumber()
     {
+        if (_state != KMGameInfo.State.Gameplay) yield break;
         object serialNumber = null;
         yield return new WaitUntil(() => { serialNumber = FindObjectOfType(_serialNumberType); return serialNumber != null; });
 
         DebugLog("Replacing serial number...");
+        foreach (var sn in FindObjectsOfType(_serialNumberType))
+        {
+            _serialNumberArrayField.SetValue(sn, new char[]
+                {
+                    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+                }
+            );
 
-        _serialNumberArrayField.SetValue(serialNumber, new char[]
-            {
-                'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
-            }
-        );
-
-        _serialNumberStartMethod.Invoke(serialNumber, null);
+            _serialNumberStartMethod.Invoke(sn, null);
+        }
     }
 }
