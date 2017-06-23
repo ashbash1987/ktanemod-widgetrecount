@@ -17,7 +17,7 @@ public class WidgetExpandService : MonoBehaviour
         public int minimumWidgetCount = 7;
         public int maximumWidgetCount = 7;
         public bool allowSerialNumberChange = true;
-        public int minimumCustomIndicators = 5;
+        public int minimumCustomIndicators = 1;
         public bool allowCustomIndicators = true;
     }
 
@@ -42,8 +42,12 @@ public class WidgetExpandService : MonoBehaviour
         Debug.LogFormat("[WidgetExpander] " + text, formatting);
     }
 
+    private KMModSettings moduleSettings;
+
     private void ReadSettings()
     {
+        DebugLog("Settings as read by KMModSettings:\n{0}\n", GetComponent<KMModSettings>().Settings);
+        DebugLog("Settings as read by moduleSettings initialized at start():\n{0}\n",moduleSettings.Settings);
         string ModSettingsDirectory = Path.Combine(Application.persistentDataPath, "Modsettings");
         string ModSettings = Path.Combine(ModSettingsDirectory, "WidgetExpand-settings.txt");
         if (File.Exists(ModSettings))
@@ -118,6 +122,7 @@ public class WidgetExpandService : MonoBehaviour
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
+        moduleSettings = GetComponent<KMModSettings>();
     }
 
     private void LateUpdate()

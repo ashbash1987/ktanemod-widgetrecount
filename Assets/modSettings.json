@@ -4,6 +4,6 @@
   "minimumWidgetCount": 7,
   "maximumWidgetCount": 7,
   "allowSerialNumberChange": true,
-  "minimumCustomIndicators": 5,
+  "minimumCustomIndicators": 1,
   "allowCustomIndicators": true
 }
