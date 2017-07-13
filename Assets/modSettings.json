@@ -1,4 +1,9 @@
 {
-	"minimumWidgetCount": 7,
-	"maximumWidgetCount": 7
+  "fileVersion": 2,
+  "allowWidgetCountChange": true,
+  "minimumWidgetCount": 7,
+  "maximumWidgetCount": 7,
+  "allowSerialNumberChange": true,
+  "minimumCustomIndicators": 1,
+  "allowCustomIndicators": true
 }
