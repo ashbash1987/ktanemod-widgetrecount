@@ -76,7 +76,10 @@ public class WidgetExpandService : MonoBehaviour
             try
             {
                 if (!Directory.Exists(ModSettingsDirectory))
+                {
                     Directory.CreateDirectory(ModSettingsDirectory);
+                }
+
                 _modSettings.fileVersion = SettingsVersion;
                 string settings = JsonConvert.SerializeObject(_modSettings, Formatting.Indented);
                 File.WriteAllText(ModSettings, settings);
@@ -94,21 +97,28 @@ public class WidgetExpandService : MonoBehaviour
         string _letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         _customIndicators = new List<string>();
 
-        foreach (var x in _letters)
-        foreach (var y in _letters)
-        foreach (var z in _letters)
-            _customIndicators.Add(x.ToString() + y + z);
+        foreach (char x in _letters)
+        {
+            foreach (char y in _letters)
+            {
+                foreach (char z in _letters)
+                {
+                    _customIndicators.Add(x.ToString() + y + z);
+                }
+            }
+        }
 
-        foreach (var x in _knownIndicators)
+        foreach (string x in _knownIndicators)
+        {
             _customIndicators.Remove(x);
+        }
         _customIndicators.Remove("NLL");
     }
 
     private void Start()
     {
         _widgetGeneratorType = ReflectionHelper.FindType("WidgetGenerator");
-        _widgetCountField = _widgetGeneratorType.GetField("NumberToGenerate",
-            BindingFlags.Instance | BindingFlags.Public);
+        _widgetCountField = _widgetGeneratorType.GetField("NumberToGenerate", BindingFlags.Instance | BindingFlags.Public);
 
         _indicatorWidgetType = ReflectionHelper.FindType("IndicatorWidget");
         _indicatorLabelsField = _indicatorWidgetType.GetField("Labels", BindingFlags.Public | BindingFlags.Static);
@@ -116,8 +126,7 @@ public class WidgetExpandService : MonoBehaviour
         InitCustomIndicators();
 
         _serialNumberType = ReflectionHelper.FindType("SerialNumber");
-        _serialNumberArrayField =
-            _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
+        _serialNumberArrayField = _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
         _serialNumberStartMethod = _serialNumberType.GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
@@ -161,24 +170,34 @@ public class WidgetExpandService : MonoBehaviour
     private void DebugPrintList(List<string> list, int count)
     {
         string listStr = "";
-        for (var i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
             if (listStr == "")
+            {
                 listStr = list[i];
+            }
             else
+            {
                 listStr += ", " + list[i];
+            }
 
-            if (i % 16 != 15) continue;
+            if (i % 16 != 15)
+            {
+                continue;
+            }
             DebugLog(listStr);
             listStr = "";
         }
+
         if (listStr != "")
+        {
             DebugLog(listStr);
+        }
     }
 
     private void ShuffleCustomIndicators()
     {
-        var list = _customIndicators;
+        List<string> list = _customIndicators;
         int n = _customIndicators.Count;
         while (n-- > 0)
         {
@@ -205,7 +224,9 @@ public class WidgetExpandService : MonoBehaviour
 
         ShuffleCustomIndicators();
         for (var i = 0; i < count; i++)
+        {
             labels.Add(_customIndicators[i]);
+        }
 
         DebugLog("In Addition to the standard 11 Indicators as well as NLL");
         DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
@@ -213,7 +234,6 @@ public class WidgetExpandService : MonoBehaviour
 
         _indicatorLabelsField.SetValue(null, labels);
     }
-
 
     private void UpdateWidgetCount()
     {
@@ -238,14 +258,22 @@ public class WidgetExpandService : MonoBehaviour
 
     IEnumerator ReplaceSerialNumber(bool allowed)
     {
-        if (!allowed) yield break;
+        if (!allowed)
+        {
+            yield break;
+        }
+
         object serialNumber = null;
         yield return new WaitUntil(() =>
         {
             serialNumber = FindObjectOfType(_serialNumberType);
             return serialNumber != null || _state == KMGameInfo.State.Setup || _state == KMGameInfo.State.PostGame;
         });
-        if (serialNumber == null) yield break;
+
+        if (serialNumber == null)
+        {
+            yield break;
+        }
 
         DebugLog("Replacing serial number...");
         foreach (var sn in FindObjectsOfType(_serialNumberType))
