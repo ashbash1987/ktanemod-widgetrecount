@@ -31,7 +31,7 @@ public class WidgetExpandService : MonoBehaviour
 
     private List<string> _knownIndicators = null;
     private List<string> _customIndicators = null;
-    private bool _refreshWidgetCount = true;
+    private bool _refreshWidgetCount = false;
 
     private Type _serialNumberType;
     private FieldInfo _serialNumberArrayField;
@@ -155,8 +155,20 @@ public class WidgetExpandService : MonoBehaviour
     private void OnStateChange(KMGameInfo.State state)
     {
         DebugLog("Game State changed to {0}", state.ToString());
-        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Transitioning;
+
         _state = state;
+
+        switch (state)
+        {
+            case KMGameInfo.State.Setup:
+            case KMGameInfo.State.PostGame:
+            case KMGameInfo.State.Quitting:
+            case KMGameInfo.State.Unlock:
+                _refreshWidgetCount = false;
+                return;
+        }
+
+        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Transitioning;
 
         if (state == KMGameInfo.State.Transitioning)
         {
@@ -223,7 +235,7 @@ public class WidgetExpandService : MonoBehaviour
         labels.Add("NLL");
 
         ShuffleCustomIndicators();
-        for (var i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
             labels.Add(_customIndicators[i]);
         }
@@ -242,6 +254,8 @@ public class WidgetExpandService : MonoBehaviour
         {
             return;
         }
+
+        DebugLog("Widget generator found.");
 
         //Because the rule manager resets the random seed to 1 before bomb generation
         UnityEngine.Random.InitState((int)Time.time);
