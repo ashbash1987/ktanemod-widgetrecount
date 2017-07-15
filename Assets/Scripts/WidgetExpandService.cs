@@ -163,8 +163,9 @@ public class WidgetExpandService : MonoBehaviour
                 _refreshWidgetCount = false;
                 break;
             case KMGameInfo.State.Transitioning:
+                if (_state == KMGameInfo.State.Transitioning ||
+                    _state == KMGameInfo.State.Gameplay) break;
                 _refreshWidgetCount = true;
-                if (_state == KMGameInfo.State.Transitioning) break;
 
                 ReadSettings();
                 _refreshWidgetCount &= _modSettings.allowWidgetCountChange;
@@ -307,5 +308,6 @@ public class WidgetExpandService : MonoBehaviour
 
             _serialNumberStartMethod.Invoke(sn, null);
         }
+        DebugLog("Done replacing serial number.");
     }
 }
