@@ -52,12 +52,9 @@ public class WidgetExpandService : MonoBehaviour
         {
             string settings = File.ReadAllText(ModSettings);
             _modSettings = JsonConvert.DeserializeObject<WidgetExpandModSettings>(settings);
-            DebugLog("Widget Expansion: {0}\nMinimum: {1}\nMaximum: {2}",
-                _modSettings.allowWidgetCountChange ? "Enabled" : "Disabled", _modSettings.minimumWidgetCount,
-                _modSettings.maximumWidgetCount);
+            DebugLog("Widget Expansion: {0}\nMinimum: {1}\nMaximum: {2}", _modSettings.allowWidgetCountChange ? "Enabled" : "Disabled", _modSettings.minimumWidgetCount, _modSettings.maximumWidgetCount);
             DebugLog("Serial Number Change: {0}", _modSettings.allowSerialNumberChange ? "Enabled" : "Disabled");
-            DebugLog("Custom Indicators: {0}\nMinimum: {1}",
-                _modSettings.allowCustomIndicators ? "Enabled" : "Disabled", _modSettings.minimumCustomIndicators);
+            DebugLog("Custom Indicators: {0}\nMinimum: {1}", _modSettings.allowCustomIndicators ? "Enabled" : "Disabled", _modSettings.minimumCustomIndicators);
 
             if (_modSettings.fileVersion != SettingsVersion)
             {
@@ -162,9 +159,12 @@ public class WidgetExpandService : MonoBehaviour
             case KMGameInfo.State.Unlock:
                 _refreshWidgetCount = false;
                 break;
+
             case KMGameInfo.State.Transitioning:
-                if (_state == KMGameInfo.State.Transitioning ||
-                    _state == KMGameInfo.State.Gameplay) break;
+                if (_state == KMGameInfo.State.Transitioning || _state == KMGameInfo.State.Gameplay)
+                {
+                    break;
+                }
                 _refreshWidgetCount = true;
 
                 ReadSettings();
@@ -283,9 +283,7 @@ public class WidgetExpandService : MonoBehaviour
             yield return new WaitUntil(() =>
             {
                 serialNumber = FindObjectOfType(_serialNumberType);
-                return serialNumber != null ||
-                       _state == KMGameInfo.State.Setup ||
-                       _state == KMGameInfo.State.PostGame;
+                return serialNumber != null || _state == KMGameInfo.State.Setup || _state == KMGameInfo.State.PostGame;
             });
         } while (serialNumber == null && _state == KMGameInfo.State.Transitioning);
 
@@ -296,7 +294,7 @@ public class WidgetExpandService : MonoBehaviour
         }
 
         DebugLog("Replacing serial number...");
-        foreach (var sn in FindObjectsOfType(_serialNumberType))
+        foreach (UnityEngine.Object sn in FindObjectsOfType(_serialNumberType))
         {
             _serialNumberArrayField.SetValue(sn, new char[]
                 {
