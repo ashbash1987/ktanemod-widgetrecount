@@ -46,8 +46,6 @@ public class WidgetExpandService : MonoBehaviour
 
     private void ReadSettings()
     {
-        DebugLog("Settings as read by KMModSettings:\n{0}\n", GetComponent<KMModSettings>().Settings);
-        DebugLog("Settings as read by moduleSettings initialized at start():\n{0}\n",moduleSettings.Settings);
         string ModSettingsDirectory = Path.Combine(Application.persistentDataPath, "Modsettings");
         string ModSettings = Path.Combine(ModSettingsDirectory, "WidgetExpand-settings.txt");
         if (File.Exists(ModSettings))
@@ -150,13 +148,11 @@ public class WidgetExpandService : MonoBehaviour
         }
     }
 
-    private KMGameInfo.State _state;
+    private KMGameInfo.State _state = KMGameInfo.State.Unlock;
 
     private void OnStateChange(KMGameInfo.State state)
     {
-        DebugLog("Game State changed to {0}", state.ToString());
-
-        _state = state;
+        DebugLog("Game State changed from {0} to {1}", _state.ToString(), state.ToString());
 
         switch (state)
         {
@@ -165,18 +161,19 @@ public class WidgetExpandService : MonoBehaviour
             case KMGameInfo.State.Quitting:
             case KMGameInfo.State.Unlock:
                 _refreshWidgetCount = false;
-                return;
-        }
+                break;
+            case KMGameInfo.State.Transitioning:
+                if (_state == KMGameInfo.State.Transitioning ||
+                    _state == KMGameInfo.State.Gameplay) break;
+                _refreshWidgetCount = true;
 
-        _refreshWidgetCount = _refreshWidgetCount || state == KMGameInfo.State.Transitioning;
-
-        if (state == KMGameInfo.State.Transitioning)
-        {
-            ReadSettings();
-            _refreshWidgetCount &= _modSettings.allowWidgetCountChange;
-            SetCustomIndicators(_modSettings.allowCustomIndicators);
-            StartCoroutine(ReplaceSerialNumber(_modSettings.allowSerialNumberChange));
+                ReadSettings();
+                _refreshWidgetCount &= _modSettings.allowWidgetCountChange;
+                SetCustomIndicators(_modSettings.allowCustomIndicators);
+                StartCoroutine(ReplaceSerialNumber(_modSettings.allowSerialNumberChange));
+                break; 
         }
+        _state = state;
     }
 
     private void DebugPrintList(List<string> list, int count)
@@ -272,20 +269,29 @@ public class WidgetExpandService : MonoBehaviour
 
     IEnumerator ReplaceSerialNumber(bool allowed)
     {
+        DebugLog("ReplaceSerialNumber() Started...");
         if (!allowed)
         {
+            DebugLog("Serial number replacement not allowed. Aborting.");
             yield break;
         }
 
+        DebugLog("Finding Serial Number...");
         object serialNumber = null;
-        yield return new WaitUntil(() =>
+        do
         {
-            serialNumber = FindObjectOfType(_serialNumberType);
-            return serialNumber != null || _state == KMGameInfo.State.Setup || _state == KMGameInfo.State.PostGame;
-        });
+            yield return new WaitUntil(() =>
+            {
+                serialNumber = FindObjectOfType(_serialNumberType);
+                return serialNumber != null ||
+                       _state == KMGameInfo.State.Setup ||
+                       _state == KMGameInfo.State.PostGame;
+            });
+        } while (serialNumber == null && _state == KMGameInfo.State.Transitioning);
 
         if (serialNumber == null)
         {
+            DebugLog("serialNumber == null. Aborting.");
             yield break;
         }
 
@@ -302,5 +308,6 @@ public class WidgetExpandService : MonoBehaviour
 
             _serialNumberStartMethod.Invoke(sn, null);
         }
+        DebugLog("Done replacing serial number.");
     }
 }
