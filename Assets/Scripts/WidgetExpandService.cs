@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public class WidgetExpandService : MonoBehaviour
 {
@@ -124,6 +125,7 @@ public class WidgetExpandService : MonoBehaviour
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
+        gameInfoComponent.OnLightsChange += OnLightsChange;
     }
 
     private void LateUpdate()
@@ -264,9 +266,18 @@ public class WidgetExpandService : MonoBehaviour
         _refreshWidgetCount = false;
     }
 
+    private bool _lights = false;
+    private void OnLightsChange(bool on)
+    {
+        _lights = on;
+    }
+
     IEnumerator ReplaceSerialNumber(bool allowed)
     {
         DebugLog("ReplaceSerialNumber() Started...");
+        List<UnityEngine.Object> snList = new List<UnityEngine.Object>();
+        _lights = false;
+        
         if (!allowed)
         {
             DebugLog("Serial number replacement not allowed. Aborting.");
@@ -291,23 +302,33 @@ public class WidgetExpandService : MonoBehaviour
         }
 
         DebugLog("Replacing allowable serial number characters...");
-        foreach (UnityEngine.Object sn in FindObjectsOfType(_serialNumberType))
+        while (!_lights)
         {
-            string serialString = (string) _serialStringField.GetValue(sn);
-            if (!string.IsNullOrEmpty(serialString))
+            foreach (UnityEngine.Object sn in FindObjectsOfType(_serialNumberType))
             {
-                DebugLog("Serial number already generated. serialNumber = {0}.",serialString);
-                continue;
-            }
-
-            DebugLog("serialNumber = null.");
-            _serialNumberArrayField.SetValue(sn, new char[]
+                if (snList.Contains(sn))
                 {
-                    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-                    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+                    continue;
                 }
-            );
+                snList.Add(sn);
+
+                string serialString = (string) _serialStringField.GetValue(sn);
+                if (!string.IsNullOrEmpty(serialString))
+                {
+                    DebugLog("Serial number already generated. serialNumber = {0}.", serialString);
+                    continue;
+                }
+
+                DebugLog("serialNumber = null.");
+                _serialNumberArrayField.SetValue(sn, new char[]
+                    {
+                        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+                    }
+                );
+            }
+            yield return null;
         }
         DebugLog("Done replacing serial number.");
     }
