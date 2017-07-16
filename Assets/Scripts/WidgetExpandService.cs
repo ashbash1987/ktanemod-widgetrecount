@@ -33,16 +33,14 @@ public class WidgetExpandService : MonoBehaviour
     private List<string> _customIndicators = null;
     private bool _refreshWidgetCount = false;
 
-    private Type _serialNumberType;
-    private FieldInfo _serialNumberArrayField;
-    private MethodInfo _serialNumberStartMethod;
+    private Type _serialNumberType = null;
+    private FieldInfo _serialStringField = null;
+    private FieldInfo _serialNumberArrayField = null;
 
     private void DebugLog(object text, params object[] formatting)
     {
         Debug.LogFormat("[WidgetExpander] " + text, formatting);
     }
-
-    private KMModSettings moduleSettings;
 
     private void ReadSettings()
     {
@@ -121,12 +119,11 @@ public class WidgetExpandService : MonoBehaviour
         InitCustomIndicators();
 
         _serialNumberType = ReflectionHelper.FindType("SerialNumber");
+        _serialStringField = _serialNumberType.GetField("serialString", BindingFlags.NonPublic | BindingFlags.Instance);
         _serialNumberArrayField = _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
-        _serialNumberStartMethod = _serialNumberType.GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
-        moduleSettings = GetComponent<KMModSettings>();
     }
 
     private void LateUpdate()
@@ -293,9 +290,17 @@ public class WidgetExpandService : MonoBehaviour
             yield break;
         }
 
-        DebugLog("Replacing serial number...");
+        DebugLog("Replacing allowable serial number characters...");
         foreach (UnityEngine.Object sn in FindObjectsOfType(_serialNumberType))
         {
+            string serialString = (string) _serialStringField.GetValue(sn);
+            if (!string.IsNullOrEmpty(serialString))
+            {
+                DebugLog("Serial number already generated. serialNumber = {0}.",serialString);
+                continue;
+            }
+
+            DebugLog("serialNumber = null.");
             _serialNumberArrayField.SetValue(sn, new char[]
                 {
                     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
@@ -303,8 +308,6 @@ public class WidgetExpandService : MonoBehaviour
                     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
                 }
             );
-
-            _serialNumberStartMethod.Invoke(sn, null);
         }
         DebugLog("Done replacing serial number.");
     }
