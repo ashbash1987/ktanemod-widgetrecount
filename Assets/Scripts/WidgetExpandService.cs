@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public class WidgetExpandService : MonoBehaviour
 {
@@ -33,16 +34,14 @@ public class WidgetExpandService : MonoBehaviour
     private List<string> _customIndicators = null;
     private bool _refreshWidgetCount = false;
 
-    private Type _serialNumberType;
-    private FieldInfo _serialNumberArrayField;
-    private MethodInfo _serialNumberStartMethod;
+    private Type _serialNumberType = null;
+    private FieldInfo _serialStringField = null;
+    private FieldInfo _serialNumberArrayField = null;
 
     private void DebugLog(object text, params object[] formatting)
     {
         Debug.LogFormat("[WidgetExpander] " + text, formatting);
     }
-
-    private KMModSettings moduleSettings;
 
     private void ReadSettings()
     {
@@ -121,12 +120,12 @@ public class WidgetExpandService : MonoBehaviour
         InitCustomIndicators();
 
         _serialNumberType = ReflectionHelper.FindType("SerialNumber");
+        _serialStringField = _serialNumberType.GetField("serialString", BindingFlags.NonPublic | BindingFlags.Instance);
         _serialNumberArrayField = _serialNumberType.GetField("possibleCharArray", BindingFlags.NonPublic | BindingFlags.Instance);
-        _serialNumberStartMethod = _serialNumberType.GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
 
         KMGameInfo gameInfoComponent = GetComponent<KMGameInfo>();
         gameInfoComponent.OnStateChange += OnStateChange;
-        moduleSettings = GetComponent<KMModSettings>();
+        gameInfoComponent.OnLightsChange += OnLightsChange;
     }
 
     private void LateUpdate()
@@ -228,6 +227,7 @@ public class WidgetExpandService : MonoBehaviour
         count = Math.Min(count, _customIndicators.Count);
 
         List<string> labels = new List<string>(_knownIndicators);
+        labels.Remove("FRK");
 
         labels.Add("NLL");
 
@@ -240,6 +240,9 @@ public class WidgetExpandService : MonoBehaviour
         DebugLog("In Addition to the standard 11 Indicators as well as NLL");
         DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
         DebugPrintList(_customIndicators, count);
+
+        //Make sure FRK is at the end of the list, as the indicator that is at labels.Length-1 is used to generate the Lit FRK rule.
+        labels.Add("FRK");
 
         _indicatorLabelsField.SetValue(null, labels);
     }
@@ -267,9 +270,18 @@ public class WidgetExpandService : MonoBehaviour
         _refreshWidgetCount = false;
     }
 
+    private bool _lights = false;
+    private void OnLightsChange(bool on)
+    {
+        _lights = on;
+    }
+
     IEnumerator ReplaceSerialNumber(bool allowed)
     {
         DebugLog("ReplaceSerialNumber() Started...");
+        List<UnityEngine.Object> snList = new List<UnityEngine.Object>();
+        _lights = false;
+        
         if (!allowed)
         {
             DebugLog("Serial number replacement not allowed. Aborting.");
@@ -293,18 +305,34 @@ public class WidgetExpandService : MonoBehaviour
             yield break;
         }
 
-        DebugLog("Replacing serial number...");
-        foreach (UnityEngine.Object sn in FindObjectsOfType(_serialNumberType))
+        DebugLog("Replacing allowable serial number characters...");
+        while (!_lights)
         {
-            _serialNumberArrayField.SetValue(sn, new char[]
+            foreach (UnityEngine.Object sn in FindObjectsOfType(_serialNumberType))
+            {
+                if (snList.Contains(sn))
                 {
-                    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-                    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+                    continue;
                 }
-            );
+                snList.Add(sn);
 
-            _serialNumberStartMethod.Invoke(sn, null);
+                string serialString = (string) _serialStringField.GetValue(sn);
+                if (!string.IsNullOrEmpty(serialString))
+                {
+                    DebugLog("Serial number already generated. serialNumber = {0}.", serialString);
+                    continue;
+                }
+
+                DebugLog("serialNumber = null.");
+                _serialNumberArrayField.SetValue(sn, new char[]
+                    {
+                        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+                    }
+                );
+            }
+            yield return null;
         }
         DebugLog("Done replacing serial number.");
     }
