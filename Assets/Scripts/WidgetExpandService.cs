@@ -227,6 +227,7 @@ public class WidgetExpandService : MonoBehaviour
         count = Math.Min(count, _customIndicators.Count);
 
         List<string> labels = new List<string>(_knownIndicators);
+        labels.Remove("FRK");
 
         labels.Add("NLL");
 
@@ -239,6 +240,9 @@ public class WidgetExpandService : MonoBehaviour
         DebugLog("In Addition to the standard 11 Indicators as well as NLL");
         DebugLog("The following {0} may spawn on the upcoming bomb(s)", count);
         DebugPrintList(_customIndicators, count);
+
+        //Make sure FRK is at the end of the list, as the indicator that is at labels.Length-1 is used to generate the Lit FRK rule.
+        labels.Add("FRK");
 
         _indicatorLabelsField.SetValue(null, labels);
     }
